@@ -1,0 +1,268 @@
+{
+  "name": "Factory | Provider-Smoke Codex Claude Gemini",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "125894db-ddee-4c8d-84e5-e6cbe3fc7709",
+      "name": "Manueller Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent-manager:8080/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"provider\": \"codex\", \"role\": \"smoke\", \"task\": \"CLI-Version pr\\u00fcfen\"}",
+        "options": {}
+      },
+      "id": "5329955d-e4a2-4de7-b3b5-32e270556663",
+      "name": "codex starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds",
+        "resume": "afterTimeInterval"
+      },
+      "id": "9e0228cd-a7af-41fa-812a-937207f8699a",
+      "name": "codex 5 Sekunden warten",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://agent-manager:8080/jobs/{{ $('codex starten').first().json.job_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "6c29d448-bca4-4ee9-ad23-3e41b62245ba",
+      "name": "codex Ergebnis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent-manager:8080/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"provider\": \"claude\", \"role\": \"smoke\", \"task\": \"CLI-Version pr\\u00fcfen\"}",
+        "options": {}
+      },
+      "id": "c920d01f-4759-4d72-b57f-a24a13441f98",
+      "name": "claude starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds",
+        "resume": "afterTimeInterval"
+      },
+      "id": "28ac7001-1496-4aeb-8424-22fc400986bc",
+      "name": "claude 5 Sekunden warten",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://agent-manager:8080/jobs/{{ $('claude starten').first().json.job_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "c9cc39c0-7d5f-4441-bdd4-3c845c88cd27",
+      "name": "claude Ergebnis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent-manager:8080/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"provider\": \"gemini\", \"role\": \"smoke\", \"task\": \"CLI-Version pr\\u00fcfen\"}",
+        "options": {}
+      },
+      "id": "cb11c222-b55a-403c-8b65-d034b83036ab",
+      "name": "gemini starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds",
+        "resume": "afterTimeInterval"
+      },
+      "id": "b7969acf-21ae-4ee8-9c29-95117b4a470f",
+      "name": "gemini 5 Sekunden warten",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://agent-manager:8080/jobs/{{ $('gemini starten').first().json.job_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "e369d7ee-6a32-4810-bdfc-b0e752aa8f51",
+      "name": "gemini Ergebnis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        620
+      ]
+    }
+  ],
+  "connections": {
+    "Manueller Start": {
+      "main": [
+        [
+          {
+            "node": "codex starten",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "claude starten",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "gemini starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "codex starten": {
+      "main": [
+        [
+          {
+            "node": "codex 5 Sekunden warten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "codex 5 Sekunden warten": {
+      "main": [
+        [
+          {
+            "node": "codex Ergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "claude starten": {
+      "main": [
+        [
+          {
+            "node": "claude 5 Sekunden warten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "claude 5 Sekunden warten": {
+      "main": [
+        [
+          {
+            "node": "claude Ergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gemini starten": {
+      "main": [
+        [
+          {
+            "node": "gemini 5 Sekunden warten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gemini 5 Sekunden warten": {
+      "main": [
+        [
+          {
+            "node": "gemini Ergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "id": "07c2f6cb-50b9-56af-8fb0-2d0f8a5e8e1e"
+}

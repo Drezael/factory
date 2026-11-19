@@ -1,0 +1,53 @@
+name: "Entwicklung / Entwicklungsänderung"
+description: "Neues Entwicklungsziel oder Änderung an laufender Entwicklung; höchste Priorität, immer erst Planung"
+title: "[Entwicklung] "
+labels: ["factory:development"]
+body:
+  - type: markdown
+    attributes:
+      value: "Entwicklungsaufträge und Änderungen an laufender Entwicklung werden zuerst geplant und in Unter-Issues zerlegt. Rückfragen bleiben als Kommentare in diesem Issue."
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Art des Entwicklungsauftrags
+      options:
+        - Neue Entwicklung
+        - Änderung an laufender Entwicklung
+        - Architektur- oder technische Anpassung
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Entwicklungsziel oder gewünschte Änderung
+      description: Beschreibe das Ziel und den betroffenen Bereich.
+    validations:
+      required: true
+  - type: input
+    id: related_issue
+    attributes:
+      label: Zugehöriges Issue oder Pull Request (optional)
+      description: Bei Änderungen an laufender Entwicklung z. B. #42 oder die PR-URL angeben.
+    validations:
+      required: false
+  - type: textarea
+    id: current_state
+    attributes:
+      label: Ist-Zustand und vorhandene Implementierung
+      description: Was existiert bereits und was darf nicht beeinträchtigt werden?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Akzeptanzkriterien
+      description: Woran erkennen wir, dass die Umsetzung erfolgreich ist?
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Abhängigkeiten und Einschränkungen
+      description: Schnittstellen, vorhandene Issues, technische Vorgaben und Risiken.
+    validations:
+      required: false

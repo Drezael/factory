@@ -1,0 +1,60 @@
+# n8n erzeugt das Projects-v2-Board automatisch, falls es fehlt.
+# Jede Issue-Karte dieses Repositories wird in diesem Project ueber Status gesteuert.
+version: 1
+repository: meine-org/backend-api
+enabled: true
+issues:
+  enabled: true
+  state: open
+  initial_sync: existing
+  required_labels: []  # Keine Label-gesteuerte Warteschlange
+  ignored_labels: ["factory:review-defect"]
+agent:
+  provider: codex
+  role: developer
+  auto_execute: false  # Bis GitHub-Token und KI-Login geprueft wurden
+  timeout_seconds: 900
+kanban:
+  enabled: true
+  owner_type: organization    # oder user
+  owner: meine-org
+  auto_create: true
+  project_title: "Factory - meine-org/backend-api"
+  view_name: "Factory Kanban"
+  # project_number weglassen: GitHub bestimmt die Nummer
+  status_field: Status
+  columns:
+    development_intake: Entwicklung Eingang
+    bug_intake: Bug Eingang
+    feature_intake: Feature Eingang
+    backlog: Backlog
+    ready: Bereit
+    in_progress: In Arbeit
+    planning: Planung
+    waiting_for_answer: Rueckfrage
+    review: Review
+    done: Erledigt
+    failed: Fehler
+
+# v5.14: Entwicklung > Bug > Feature; alle drei mit Pflicht-Planung.
+pipeline:
+  enabled: true
+  base_branch: main
+  developer_provider: codex
+  reviewer_provider: claude
+  max_review_cycles: 3
+  # Exact GitHub Actions check name from .github/workflows in THIS repo
+  required_checks: [factory-tests]
+  auto_merge: true   # requires FACTORY_GITHUB_AUTOMERGE_ENABLED=true
+
+# Jede normale Issue-Anforderung wird ZUERST von einem Planungsworker strukturiert.
+planning:
+  enabled: true
+  provider: codex
+  max_tasks: 40
+
+# Drei Eingangstypen (Entwicklung, Bug, Feature): GitHub-Formulare + Statuskategorien.
+intake:
+  enabled: true
+  auto_install_forms: true
+  auto_plan_on_create: true  # Alternative false: mensch verschiebt Ticket auf Bereit

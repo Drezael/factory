@@ -1,0 +1,154 @@
+{
+  "name": "Factory 01 | Systemstatus",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Factory 01 – Systemstatus\n\nNur lesende API-Aufrufe. `/health` ist ohne Credential erreichbar; für `/roles` und `/jobs` **Header Auth** auswählen.\n\nAlle Requests laufen im internen Docker-Netz.",
+        "width": 450,
+        "height": 250,
+        "color": 5
+      },
+      "id": "d641d327-6bf8-5b45-950a-f1868ba30409",
+      "name": "INFO 01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        -260
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "87d10f6a-9c5a-5d2e-af7c-7bc66153b280",
+      "name": "Manuell starten",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -650,
+        170
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://agent-manager:8080/health",
+        "options": {}
+      },
+      "id": "917622e8-d3de-5f48-8b15-31473f57cebd",
+      "name": "Manager Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        170
+      ],
+      "notes": "Erreichbarkeit, Docker Engine. Kein Token erforderlich.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "url": "http://agent-manager:8080/roles",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "e7dcdd5f-1ecb-5cb3-a305-d6ffb64635e4",
+      "name": "Agent-Katalog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -120,
+        170
+      ],
+      "notes": "Header Auth: Authorization = Bearer <FACTORY_AGENT_API_TOKEN>.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "url": "http://agent-manager:8080/jobs",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "bc1ec7d4-ed0a-5f2a-a027-830f08097a37",
+      "name": "Jobs abrufen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        140,
+        170
+      ],
+      "notes": "Nutzt dieselbe Header Auth Credential.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const health = $('Manager Health').first().json;\nconst catalog = $('Agent-Katalog').first().json;\nconst apiJobs = $input.first().json;\nconst jobs = Array.isArray(apiJobs.jobs) ? apiJobs.jobs : [];\nconst active = jobs.filter(j => ['running', 'created', 'restarting', 'pending'].includes(j.docker_status || j.status)).length;\nconst logins = Object.fromEntries((catalog.providers || []).map(provider => {\n  const roles = catalog.logins?.[provider] || {};\n  return [provider, Object.fromEntries(Object.entries(roles).map(([role, r]) => [role, !!r.ready]))];\n}));\nreturn [{json:{\n  factory:'factory',\n  status:health.status || 'unknown',\n  docker:health.docker || 'unknown',\n  providers:catalog.providers || [],\n  roles:catalog.roles || [],\n  worker_images:catalog.images || {},\n  login_readiness:logins,\n  job_count:jobs.length,\n  active_job_count:active,\n  jobs:jobs,\n  note:'Login readiness is informational. Smoke agents need no AI login.'\n}}];"
+      },
+      "id": "ad11170f-a24a-5fed-a3f4-59c1bc0c05a5",
+      "name": "Factory Übersicht",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        410,
+        170
+      ]
+    }
+  ],
+  "connections": {
+    "Manuell starten": {
+      "main": [
+        [
+          {
+            "node": "Manager Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager Health": {
+      "main": [
+        [
+          {
+            "node": "Agent-Katalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent-Katalog": {
+      "main": [
+        [
+          {
+            "node": "Jobs abrufen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jobs abrufen": {
+      "main": [
+        [
+          {
+            "node": "Factory Übersicht",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "62f4b6ef-a7d9-54ff-b7a5-321aec7b0fcd"
+}

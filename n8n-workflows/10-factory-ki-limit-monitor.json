@@ -1,0 +1,73 @@
+{
+  "id": "8520c5b0-1771-5589-ae3e-6d2d00516df1",
+  "name": "Factory 10 | KI Limits automatisch pruefen",
+  "nodes": [
+    {
+      "id": "6f6eb813-6762-586e-a2d0-0d0b865e8b94",
+      "name": "Alle 5 Minuten",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-620, 100],
+      "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}}
+    },
+    {
+      "id": "10f93efa-873a-57e2-84dc-35788a5ffdf6",
+      "name": "Manueller Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-620, 300],
+      "parameters": {}
+    },
+    {
+      "id": "f6f0420b-0ef3-50c2-955b-12b554eab8e0",
+      "name": "Status-Worker starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-350, 170],
+      "parameters": {"method": "POST", "url": "http://github-registry:8090/limits/refresh", "options": {"timeout": 30000}}
+    },
+    {
+      "id": "30924fcb-6c4e-5c33-a916-99986c334217",
+      "name": "35 Sekunden auf Probes warten",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-100, 170],
+      "parameters": {"resume": "afterTimeInterval", "amount": 35, "unit": "seconds"}
+    },
+    {
+      "id": "07b20bfc-6371-5694-b7e2-41d68780b33e",
+      "name": "Kontingente abfragen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [150, 170],
+      "parameters": {"url": "http://github-registry:8090/limits", "options": {"timeout": 30000}}
+    },
+    {
+      "id": "ea7ed3b3-20d4-55fa-a143-8cb991359646",
+      "name": "Verfuegbarkeit anzeigen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [410, 170],
+      "parameters": {"mode": "runOnceForAllItems", "jsCode": "const data=$input.first().json; return (data.profiles||[]).map(p=>({json:{provider:p.provider,profile:p.profile,status:p.status,fresh:!!p.fresh,age_seconds:p.age_seconds??null,limits:p.details?.buckets||{},reset_at:p.details?.buckets?.codex?.windows?.[0]?.resets_at??null,reason:p.reason||p.details?.reason||null,warning:'Unbekannt bedeutet keine nachgewiesene Kapazitaet.'}}));"}
+    },
+    {
+      "id": "22437ae6-61da-5236-b753-768b6e568c2b",
+      "name": "Info",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-650, -300],
+      "parameters": {"content": "# Factory 10 – KI-Limit-Monitor\nAlle 5 Minuten werden kurzlebige Codex-/Claude-/Gemini-Status-Container gestartet, soweit Login-Profile bereit und gerade nicht belegt sind. Keine KI-Prompts oder Modellaufrufe.\n\n**Codex:** genaue von der App-Server-API gemeldete Belegung (Prozent + Reset-Zeit) je Limitfenster. Nicht exakt verbleibende Token.\n**Claude/Gemini:** interaktive Statusansicht; solange keine robuste maschinenlesbare Quoten-Antwort vorliegt, `unknown`.\n\nDie Factory startet standardmaessig **keinen** KI-Worker bei `unknown`, `checking`, `exhausted` oder veralteten Messungen. `smoke` bleibt weiterhin moeglich.\n\nKein GitHub-, API- oder KI-Modell-Token in den n8n-Nodes. Der interne github-registry-Dienst leitet lediglich an den Manager weiter.", "width": 650, "height": 280}
+    }
+  ],
+  "connections": {
+    "Alle 5 Minuten": {"main": [[{"node": "Status-Worker starten", "type": "main", "index": 0}]]},
+    "Manueller Test": {"main": [[{"node": "Status-Worker starten", "type": "main", "index": 0}]]},
+    "Status-Worker starten": {"main": [[{"node": "35 Sekunden auf Probes warten", "type": "main", "index": 0}]]},
+    "35 Sekunden auf Probes warten": {"main": [[{"node": "Kontingente abfragen", "type": "main", "index": 0}]]},
+    "Kontingente abfragen": {"main": [[{"node": "Verfuegbarkeit anzeigen", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

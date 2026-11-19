@@ -1,0 +1,69 @@
+{
+  "name": "Factory 06 | GitHub Registry Status",
+  "nodes": [
+    {
+      "id": "3382c0c9-14e0-54c3-a2a2-470b1d36c545",
+      "name": "Info Registry Status",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        -230
+      ],
+      "parameters": {
+        "content": "# Factory 06 – Registry Status\n\nZeigt, ob das private GitHub Registry Repository konfiguriert wurde, wie viele Repositories gescannt wurden und wie viele Issues in der Warteschlange liegen. Kein Credential in n8n noetig.",
+        "width": 420,
+        "height": 220,
+        "color": 5
+      }
+    },
+    {
+      "id": "5cfd21d7-40a7-5a4b-ae53-aeab33a27c15",
+      "name": "Registry pruefen",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -340,
+        140
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "4fc7e370-20a0-51a8-92ae-9f41cc44bda7",
+      "name": "GitHub Registry Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -40,
+        140
+      ],
+      "parameters": {
+        "url": "http://github-registry:8090/health",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Registry pruefen": {
+      "main": [
+        [
+          {
+            "node": "GitHub Registry Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "f3df2d24-e520-53a9-a1ff-4f8bacfd26b2"
+}

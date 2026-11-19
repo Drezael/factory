@@ -1,0 +1,36 @@
+name: "Feature Request"
+description: "Neue Funktion vorschlagen – wird zuerst durch die Factory geplant"
+title: "[Feature] "
+labels: ["factory:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: "Ein Feature wird zuerst geplant; erst die erzeugten Arbeitsschritte werden entwickelt."
+  - type: textarea
+    id: goal
+    attributes:
+      label: Ziel und Nutzen
+      description: Welches Problem soll das Feature lösen?
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: Gewünschtes Verhalten
+      description: Was soll die Software danach können?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Akzeptanzkriterien
+      description: Woran kann die Factory das Ergebnis testen?
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Einschränkungen und Abhängigkeiten
+      description: Schnittstellen, Plattformen oder technische Vorgaben.
+    validations:
+      required: false

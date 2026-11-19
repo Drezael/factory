@@ -1,0 +1,110 @@
+{
+  "name": "Factory | Smoke Agent starten und Status abfragen",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "07963ffa-c989-470d-9d48-476d32c12363",
+      "name": "Manueller Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent-manager:8080/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"role\": \"smoke\", \"task\": \"Bitte pruefe die Agent-Umgebung.\"}",
+        "options": {}
+      },
+      "id": "9b4fbcfa-7dce-4420-8f30-65b0c6ce3ad4",
+      "name": "Agent starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds",
+        "resume": "afterTimeInterval"
+      },
+      "id": "b73b8af2-e2a6-4067-90f4-2544560ce8a2",
+      "name": "5 Sekunden warten",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://agent-manager:8080/jobs/{{ $('Agent starten').first().json.job_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "26b65251-72f0-4aa5-b538-b57cc3c24ec0",
+      "name": "Agent Status und Ergebnis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manueller Start": {
+      "main": [
+        [
+          {
+            "node": "Agent starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent starten": {
+      "main": [
+        [
+          {
+            "node": "5 Sekunden warten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 Sekunden warten": {
+      "main": [
+        [
+          {
+            "node": "Agent Status und Ergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "id": "3f5ce9bf-fbee-5ba2-bd88-5ffad0409bce"
+}

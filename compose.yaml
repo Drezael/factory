@@ -1,0 +1,339 @@
+name: ${FACTORY_NAME}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE}
+    restart: ${FACTORY_RESTART_POLICY}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - type: bind
+        source: ${FACTORY_POSTGRES_DATA_DIR:?Set FACTORY_POSTGRES_DATA_DIR via factory.sh}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - factory_internal
+
+  n8n:
+    image: ${N8N_IMAGE}
+    restart: ${FACTORY_RESTART_POLICY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${FACTORY_BIND_IP}:${FACTORY_HTTP_PORT}:${N8N_PORT}"
+    environment:
+      DB_TYPE: ${DB_TYPE}
+      DB_POSTGRESDB_HOST: ${DB_POSTGRESDB_HOST}
+      DB_POSTGRESDB_PORT: ${DB_POSTGRESDB_PORT}
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: ${N8N_PORT}
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: ${N8N_BLOCK_ENV_ACCESS_IN_NODE}
+      N8N_DIAGNOSTICS_ENABLED: ${N8N_DIAGNOSTICS_ENABLED}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
+      TZ: ${TZ}
+    volumes:
+      - type: bind
+        source: ${FACTORY_N8N_DATA_DIR:?Set FACTORY_N8N_DATA_DIR via factory.sh}
+        target: /home/node/.n8n
+        bind:
+          create_host_path: false
+      # Workflow JSON files from the host are available to n8n (read-only).
+      # n8n >= 2.0 allows filesystem access inside ~/.n8n-files by default.
+      - type: bind
+        source: ${FACTORY_N8N_WORKFLOWS_DIR:?Set FACTORY_N8N_WORKFLOWS_DIR via factory.sh}
+        target: /home/node/.n8n-files/workflows
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - factory_internal
+      - factory_egress
+
+  # Automatically register JSON workflows in n8n when the Factory starts.
+  # No Docker socket and no public port. Only changed files are imported.
+  workflow-sync:
+    image: ${N8N_IMAGE}
+    restart: ${FACTORY_RESTART_POLICY}
+    init: true
+    user: "1000:1000"
+    entrypoint: ["node", "/opt/factory/workflow-sync.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      n8n:
+        condition: service_started
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,nosuid,size=64m
+      - /home/node/.cache:rw,nosuid,size=64m
+    volumes:
+      - type: bind
+        source: ./workflow-sync/sync.js
+        target: /opt/factory/workflow-sync.js
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${FACTORY_N8N_WORKFLOWS_DIR:?Set FACTORY_N8N_WORKFLOWS_DIR via factory.sh}
+        target: /home/node/.n8n-files/workflows
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${FACTORY_N8N_SYNC_DATA_DIR:?Set FACTORY_N8N_SYNC_DATA_DIR via factory.sh}
+        target: /home/node/.n8n
+        bind:
+          create_host_path: false
+    environment:
+      DB_TYPE: ${DB_TYPE}
+      DB_POSTGRESDB_HOST: ${DB_POSTGRESDB_HOST}
+      DB_POSTGRESDB_PORT: ${DB_POSTGRESDB_PORT}
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS}
+      N8N_DIAGNOSTICS_ENABLED: ${N8N_DIAGNOSTICS_ENABLED}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
+      TZ: ${TZ}
+      FACTORY_N8N_AUTO_IMPORT: ${FACTORY_N8N_AUTO_IMPORT}
+      FACTORY_GITHUB_AUTO_PUBLISH: ${FACTORY_GITHUB_AUTO_PUBLISH}
+      FACTORY_LIMIT_MONITOR_ENABLED: ${FACTORY_LIMIT_MONITOR_ENABLED:-true}
+      FACTORY_GITHUB_DEFAULT_PLANNER_PROVIDER: ${FACTORY_GITHUB_DEFAULT_PLANNER_PROVIDER:-codex}
+      FACTORY_GITHUB_DEFAULT_DEVELOPER_PROVIDER: ${FACTORY_GITHUB_DEFAULT_DEVELOPER_PROVIDER:-codex}
+      FACTORY_GITHUB_DEFAULT_REVIEWER_PROVIDER: ${FACTORY_GITHUB_DEFAULT_REVIEWER_PROVIDER:-claude}
+      FACTORY_GITHUB_DEFAULT_TIMEOUT_SEC: ${FACTORY_GITHUB_DEFAULT_TIMEOUT_SEC:-900}
+      FACTORY_GITHUB_DEFAULT_MAX_REVIEW_CYCLES: ${FACTORY_GITHUB_DEFAULT_MAX_REVIEW_CYCLES:-3}
+      FACTORY_GITHUB_DEFAULT_MAX_PLAN_TASKS: ${FACTORY_GITHUB_DEFAULT_MAX_PLAN_TASKS:-40}
+      FACTORY_GITHUB_DEFAULT_REQUIRED_CHECKS: ${FACTORY_GITHUB_DEFAULT_REQUIRED_CHECKS:-}
+      FACTORY_GITHUB_DEFAULT_AUTO_MERGE: ${FACTORY_GITHUB_DEFAULT_AUTO_MERGE:-false}
+      FACTORY_GITHUB_DEFAULT_AUTO_PLAN_ON_CREATE: ${FACTORY_GITHUB_DEFAULT_AUTO_PLAN_ON_CREATE:-true}
+      FACTORY_GITHUB_DEFAULT_AUTO_INSTALL_FORMS: ${FACTORY_GITHUB_DEFAULT_AUTO_INSTALL_FORMS:-true}
+      FACTORY_GITHUB_AUTORUN_ENABLED: ${FACTORY_GITHUB_AUTORUN_ENABLED:-false}
+      FACTORY_GITHUB_AUTOMERGE_ENABLED: ${FACTORY_GITHUB_AUTOMERGE_ENABLED:-false}
+      FACTORY_N8N_IMPORT_PROJECT_ID: ${FACTORY_N8N_IMPORT_PROJECT_ID}
+      FACTORY_N8N_SYNC_INTERVAL_SEC: ${FACTORY_N8N_SYNC_INTERVAL_SEC}
+      FACTORY_N8N_SYNC_IMPORT_TIMEOUT_SEC: ${FACTORY_N8N_SYNC_IMPORT_TIMEOUT_SEC}
+      FACTORY_N8N_SYNC_HEALTH_URL: http://n8n:${N8N_PORT}/healthz/readiness
+    networks:
+      - factory_internal
+
+  # GitHub Registry + one-shot Issue state machine, driven by n8n over factory_internal.
+  # Never receives AI logins or a Docker socket; only the manager may create workers.
+  github-registry:
+    image: ${FACTORY_GITHUB_REGISTRY_IMAGE}
+    build:
+      context: ./github-registry
+      dockerfile: Dockerfile
+    restart: ${FACTORY_RESTART_POLICY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    user: "10001:1000"
+    volumes:
+      # Finished agent sources only. GitHub write token stays in this service.
+      - type: bind
+        source: ${FACTORY_WORKSPACE_DATA_DIR:?Set FACTORY_WORKSPACE_DATA_DIR via factory.sh}
+        target: /opt/factory-workspaces
+        read_only: true
+        bind:
+          create_host_path: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,nosuid,noexec,size=16m
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      FACTORY_GITHUB_REGISTRY_PORT: ${FACTORY_GITHUB_REGISTRY_PORT}
+      FACTORY_GITHUB_REGISTRY_REPO: ${FACTORY_GITHUB_REGISTRY_REPO:-}
+      FACTORY_GITHUB_REGISTRY_REF: ${FACTORY_GITHUB_REGISTRY_REF}
+      FACTORY_GITHUB_REGISTRY_DIR: ${FACTORY_GITHUB_REGISTRY_DIR}
+      FACTORY_GITHUB_REGISTRY_TOKEN: ${FACTORY_GITHUB_REGISTRY_TOKEN:-}
+      FACTORY_LIMIT_MONITOR_ENABLED: ${FACTORY_LIMIT_MONITOR_ENABLED:-true}
+      FACTORY_GITHUB_API_URL: ${FACTORY_GITHUB_API_URL}
+      FACTORY_GITHUB_API_VERSION: ${FACTORY_GITHUB_API_VERSION}
+      FACTORY_GITHUB_DEFAULT_PLANNER_PROVIDER: ${FACTORY_GITHUB_DEFAULT_PLANNER_PROVIDER:-codex}
+      FACTORY_GITHUB_DEFAULT_DEVELOPER_PROVIDER: ${FACTORY_GITHUB_DEFAULT_DEVELOPER_PROVIDER:-codex}
+      FACTORY_GITHUB_DEFAULT_REVIEWER_PROVIDER: ${FACTORY_GITHUB_DEFAULT_REVIEWER_PROVIDER:-claude}
+      FACTORY_GITHUB_DEFAULT_TIMEOUT_SEC: ${FACTORY_GITHUB_DEFAULT_TIMEOUT_SEC:-900}
+      FACTORY_GITHUB_DEFAULT_MAX_REVIEW_CYCLES: ${FACTORY_GITHUB_DEFAULT_MAX_REVIEW_CYCLES:-3}
+      FACTORY_GITHUB_DEFAULT_MAX_PLAN_TASKS: ${FACTORY_GITHUB_DEFAULT_MAX_PLAN_TASKS:-40}
+      FACTORY_GITHUB_DEFAULT_REQUIRED_CHECKS: ${FACTORY_GITHUB_DEFAULT_REQUIRED_CHECKS:-}
+      FACTORY_GITHUB_DEFAULT_AUTO_MERGE: ${FACTORY_GITHUB_DEFAULT_AUTO_MERGE:-false}
+      FACTORY_GITHUB_DEFAULT_AUTO_PLAN_ON_CREATE: ${FACTORY_GITHUB_DEFAULT_AUTO_PLAN_ON_CREATE:-true}
+      FACTORY_GITHUB_DEFAULT_AUTO_INSTALL_FORMS: ${FACTORY_GITHUB_DEFAULT_AUTO_INSTALL_FORMS:-true}
+      FACTORY_GITHUB_AUTORUN_ENABLED: ${FACTORY_GITHUB_AUTORUN_ENABLED:-false}
+      FACTORY_GITHUB_AUTOMERGE_ENABLED: ${FACTORY_GITHUB_AUTOMERGE_ENABLED:-false}
+      FACTORY_AGENT_API_TOKEN: ${FACTORY_AGENT_API_TOKEN}
+      FACTORY_AGENT_MANAGER_PORT: ${FACTORY_AGENT_MANAGER_PORT}
+    expose:
+      - "${FACTORY_GITHUB_REGISTRY_PORT}"
+    networks:
+      - factory_internal
+      - factory_egress
+
+  agent-manager:
+    image: ${FACTORY_AGENT_MANAGER_IMAGE}
+    build:
+      context: ./manager
+      dockerfile: Dockerfile
+    restart: ${FACTORY_RESTART_POLICY}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Needed for Docker socket permissions, reading auth status and
+    # assigning worker UID ownership to created bind-mounted workspaces.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+    tmpfs:
+      - /tmp:rw,nosuid,noexec,size=16m
+    volumes:
+      # Docker Engine control is privileged; only the manager has this socket.
+      - type: bind
+        source: ${FACTORY_DOCKER_SOCKET}
+        target: /var/run/docker.sock
+      # Login directories remain read-only in the manager. Workers get ONLY
+      # their selected provider/profile, writable for OAuth token rotation.
+      - type: bind
+        source: ${FACTORY_AUTH_DATA_DIR:?Set FACTORY_AUTH_DATA_DIR via factory.sh}
+        target: /opt/factory-auth
+        read_only: true
+        bind:
+          create_host_path: false
+      # Per-job workspaces: manager prepares ownership, worker writes code.
+      - type: bind
+        source: ${FACTORY_WORKSPACE_DATA_DIR:?Set FACTORY_WORKSPACE_DATA_DIR via factory.sh}
+        target: /opt/factory-workspaces
+        bind:
+          create_host_path: false
+    environment:
+      FACTORY_NAME: ${FACTORY_NAME}
+      FACTORY_AGENT_API_TOKEN: ${FACTORY_AGENT_API_TOKEN}
+      FACTORY_AGENT_MANAGER_PORT: ${FACTORY_AGENT_MANAGER_PORT}
+      FACTORY_LIMIT_MONITOR_ENABLED: ${FACTORY_LIMIT_MONITOR_ENABLED:-true}
+      FACTORY_LIMIT_UNKNOWN_POLICY: ${FACTORY_LIMIT_UNKNOWN_POLICY:-block}
+      FACTORY_LIMIT_REFRESH_SEC: ${FACTORY_LIMIT_REFRESH_SEC:-300}
+      FACTORY_LIMIT_CHECK_TIMEOUT_SEC: ${FACTORY_LIMIT_CHECK_TIMEOUT_SEC:-25}
+      FACTORY_LIMIT_MIN_REMAINING_PERCENT: ${FACTORY_LIMIT_MIN_REMAINING_PERCENT:-5}
+      FACTORY_LIMIT_CODEX_BUCKETS: ${FACTORY_LIMIT_CODEX_BUCKETS:-codex}
+      FACTORY_LIMIT_MAX_PROBES: ${FACTORY_LIMIT_MAX_PROBES:-3}
+      FACTORY_AGENT_IMAGE_PREFIX: ${FACTORY_AGENT_IMAGE_PREFIX}
+      FACTORY_AGENT_IMAGE_TAG: ${FACTORY_AGENT_IMAGE_TAG}
+      FACTORY_AGENT_MAX_CONCURRENT: ${FACTORY_AGENT_MAX_CONCURRENT}
+      FACTORY_AGENT_DEFAULT_TIMEOUT_SEC: ${FACTORY_AGENT_DEFAULT_TIMEOUT_SEC}
+      FACTORY_AGENT_MAX_TIMEOUT_SEC: ${FACTORY_AGENT_MAX_TIMEOUT_SEC}
+      FACTORY_AGENT_RETENTION_SEC: ${FACTORY_AGENT_RETENTION_SEC}
+      FACTORY_AGENT_MEMORY_MB: ${FACTORY_AGENT_MEMORY_MB}
+      FACTORY_AGENT_CPUS: ${FACTORY_AGENT_CPUS}
+      FACTORY_AGENT_PIDS_LIMIT: ${FACTORY_AGENT_PIDS_LIMIT}
+      FACTORY_WORKER_NETWORK_MODE: ${FACTORY_EGRESS_NETWORK}
+      FACTORY_EGRESS_NETWORK: ${FACTORY_EGRESS_NETWORK}
+      FACTORY_HOST_AUTH_ROOT: ${FACTORY_AUTH_DATA_DIR}
+      FACTORY_HOST_WORKSPACE_ROOT: ${FACTORY_WORKSPACE_DATA_DIR}
+      FACTORY_CODEX_SANDBOX: ${FACTORY_CODEX_SANDBOX}
+      FACTORY_CLAUDE_PERMISSION_WRITE: ${FACTORY_CLAUDE_PERMISSION_WRITE}
+      FACTORY_GEMINI_APPROVAL_WRITE: ${FACTORY_GEMINI_APPROVAL_WRITE}
+      FACTORY_CODEX_PROFILE_REQUIREMENTS: ${FACTORY_CODEX_PROFILE_REQUIREMENTS:-default}
+      FACTORY_CODEX_PROFILE_ARCHITECT: ${FACTORY_CODEX_PROFILE_ARCHITECT:-default}
+      FACTORY_CODEX_PROFILE_PLANNER: ${FACTORY_CODEX_PROFILE_PLANNER:-default}
+      FACTORY_CODEX_PROFILE_DEVELOPER: ${FACTORY_CODEX_PROFILE_DEVELOPER:-default}
+      FACTORY_CODEX_PROFILE_TESTER: ${FACTORY_CODEX_PROFILE_TESTER:-default}
+      FACTORY_CODEX_PROFILE_REVIEWER: ${FACTORY_CODEX_PROFILE_REVIEWER:-default}
+      FACTORY_CODEX_PROFILE_SECURITY: ${FACTORY_CODEX_PROFILE_SECURITY:-default}
+      FACTORY_CLAUDE_PROFILE_REQUIREMENTS: ${FACTORY_CLAUDE_PROFILE_REQUIREMENTS}
+      FACTORY_CLAUDE_PROFILE_ARCHITECT: ${FACTORY_CLAUDE_PROFILE_ARCHITECT}
+      FACTORY_CLAUDE_PROFILE_PLANNER: ${FACTORY_CLAUDE_PROFILE_PLANNER:-default}
+      FACTORY_CLAUDE_PROFILE_DEVELOPER: ${FACTORY_CLAUDE_PROFILE_DEVELOPER}
+      FACTORY_CLAUDE_PROFILE_TESTER: ${FACTORY_CLAUDE_PROFILE_TESTER}
+      FACTORY_CLAUDE_PROFILE_REVIEWER: ${FACTORY_CLAUDE_PROFILE_REVIEWER}
+      FACTORY_CLAUDE_PROFILE_SECURITY: ${FACTORY_CLAUDE_PROFILE_SECURITY}
+      FACTORY_GEMINI_PROFILE_REQUIREMENTS: ${FACTORY_GEMINI_PROFILE_REQUIREMENTS}
+      FACTORY_GEMINI_PROFILE_ARCHITECT: ${FACTORY_GEMINI_PROFILE_ARCHITECT}
+      FACTORY_GEMINI_PROFILE_PLANNER: ${FACTORY_GEMINI_PROFILE_PLANNER:-default}
+      FACTORY_GEMINI_PROFILE_DEVELOPER: ${FACTORY_GEMINI_PROFILE_DEVELOPER}
+      FACTORY_GEMINI_PROFILE_TESTER: ${FACTORY_GEMINI_PROFILE_TESTER}
+      FACTORY_GEMINI_PROFILE_REVIEWER: ${FACTORY_GEMINI_PROFILE_REVIEWER}
+      FACTORY_GEMINI_PROFILE_SECURITY: ${FACTORY_GEMINI_PROFILE_SECURITY}
+      FACTORY_GITHUB_TOKEN: ${FACTORY_GITHUB_TOKEN}
+    expose:
+      - "${FACTORY_AGENT_MANAGER_PORT}"
+    networks:
+      - factory_internal
+
+  # Worker images are built independently; they do NOT run as compose services.
+  # Each POST /jobs call starts its own short-lived Docker container.
+  image-codex:
+    profiles: [agent-images]
+    network_mode: none
+    image: ${FACTORY_AGENT_IMAGE_PREFIX}-codex:${FACTORY_AGENT_IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: worker/Dockerfile.codex
+      args:
+        CODEX_VERSION: ${FACTORY_CODEX_VERSION}
+
+  image-claude:
+    profiles: [agent-images]
+    network_mode: none
+    image: ${FACTORY_AGENT_IMAGE_PREFIX}-claude:${FACTORY_AGENT_IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: worker/Dockerfile.claude
+      args:
+        CLAUDE_VERSION: ${FACTORY_CLAUDE_VERSION}
+
+  image-gemini:
+    profiles: [agent-images]
+    network_mode: none
+    image: ${FACTORY_AGENT_IMAGE_PREFIX}-gemini:${FACTORY_AGENT_IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: worker/Dockerfile.gemini
+      args:
+        GEMINI_VERSION: ${FACTORY_GEMINI_VERSION}
+
+# Factory control traffic is isolated from outside networks.
+# Outgoing Internet access is limited to n8n and dynamically spawned workers.
+# ICC disabled on egress bridge to prevent direct peer-to-peer container traffic.
+networks:
+  factory_internal:
+    name: ${FACTORY_INTERNAL_NETWORK:?Set FACTORY_INTERNAL_NETWORK}
+    driver: bridge
+    internal: true
+  factory_egress:
+    name: ${FACTORY_EGRESS_NETWORK:?Set FACTORY_EGRESS_NETWORK}
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"

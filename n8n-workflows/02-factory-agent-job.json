@@ -1,0 +1,422 @@
+{
+  "name": "Factory 02 | Agent starten und ueberwachen",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Factory 02 – Agent ausführen\n\nBearbeite **Auftrag konfigurieren**. Für den ersten Test: `role=smoke` und Anbieter `codex`/`claude`/`gemini`.\n\nErst nach der späteren KI-Anmeldung andere Rollen auswählen. Kein öffentlicher Webhook.\n\nHeader Auth bei allen HTTP-Nodes eintragen.",
+        "width": 470,
+        "height": 280,
+        "color": 5
+      },
+      "id": "eb90ffe4-e572-5d1c-9e27-38c4713659ca",
+      "name": "INFO 02",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1110,
+        -390
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "fd90ee93-f7ad-5fce-b170-2c494474f753",
+      "name": "Manueller Auftrag",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bdb06e78-7c10-51f3-9dcb-ea948c588362",
+              "name": "provider",
+              "value": "codex",
+              "type": "string"
+            },
+            {
+              "id": "c5661a90-2576-5b77-971e-ac7c621e0f7a",
+              "name": "role",
+              "value": "smoke",
+              "type": "string"
+            },
+            {
+              "id": "9e6149a9-d453-5cc9-ae83-bab66a0c674c",
+              "name": "task",
+              "value": "Prüfe die Werkzeuge in deinem Worker-Container.",
+              "type": "string"
+            },
+            {
+              "id": "f016d4a2-0dc2-5a26-b896-a59bb3d06610",
+              "name": "timeout_seconds",
+              "value": 90,
+              "type": "number"
+            },
+            {
+              "id": "4b237d09-b96c-5454-9498-3cbe8f95b9bb",
+              "name": "max_poll_attempts",
+              "value": 42,
+              "type": "number"
+            },
+            {
+              "id": "c77db369-e501-5c7a-9d7c-ab3cf7eee30c",
+              "name": "repository",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "3d6611b8-8e27-576f-bca0-8abaee13c586",
+              "name": "ref",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4a695eab-6aa5-54a9-aaf7-c873e9d23431",
+      "name": "Auftrag konfigurieren",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -670,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const x=$input.first().json;\nconst providers=['codex','claude','gemini'];\nconst roles=['smoke','requirements','architect','developer','tester','reviewer','security'];\nif (!providers.includes(x.provider)) throw new Error('Unbekannter provider: '+x.provider);\nif (!roles.includes(x.role)) throw new Error('Unbekannte role: '+x.role);\nif (typeof x.task!=='string'||x.task.length>12000||(x.role!=='smoke'&&!x.task.trim())) throw new Error('task ungueltig oder leer');\nif (!Number.isInteger(x.timeout_seconds)||x.timeout_seconds<10||x.timeout_seconds>1800) throw new Error('timeout_seconds muss 10 bis 1800 sein (und <= FACTORY_AGENT_MAX_TIMEOUT_SEC).');\nif (!Number.isInteger(x.max_poll_attempts)||x.max_poll_attempts<1||x.max_poll_attempts>1000) throw new Error('max_poll_attempts muss zwischen 1 und 1000 liegen.');\nif (x.ref&&!x.repository) throw new Error('ref erfordert repository');\nconst request={provider:x.provider,role:x.role,task:x.task,timeout_seconds:x.timeout_seconds};\nif (x.repository) request.repository=x.repository;\nif (x.ref) request.ref=x.ref;\nreturn [{json:{...x,request}}];"
+      },
+      "id": "1468f8b6-5b64-5c32-80a1-4427d2f51bc1",
+      "name": "Auftrag validieren",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -430,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent-manager:8080/jobs",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}"
+      },
+      "id": "47eecfab-602d-52e0-8030-5c85954d143a",
+      "name": "Job starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        150
+      ],
+      "notes": "Erstellt einen einzelnen kurzlebigen Container. Ein echter KI-Job braucht spaeter einen Anbieter-Login.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "resume": "afterTimeInterval",
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "c8f964d4-edf8-5187-9241-4e6e0f64d555",
+      "name": "3 Sekunden warten",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        40,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"http://agent-manager:8080/jobs/\" + $json.job_id }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "a77e4951-add9-5189-b3a1-b24d87eb6b6c",
+      "name": "Job abfragen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const status=$input.first().json;\nconst attempt=$runIndex+1;\nconst limit=$('Auftrag konfigurieren').first().json.max_poll_attempts;\nconst pending=['running','pending'].includes(status.status);\nreturn [{json:{...status,poll_count:attempt,continue_polling:pending&&attempt<limit,poll_limit_reached:pending&&attempt>=limit}}];"
+      },
+      "id": "f05d0dd1-3aa4-5cbf-9dab-411e21ebd69d",
+      "name": "Status auswerten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ffbdcd1f-b50a-564c-b5e6-5c4e785f62ef",
+              "leftValue": "={{ String($json.continue_polling) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8933a58f-4847-512a-8509-296fee0208dd",
+      "name": "Weiter warten?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fe381a51-9043-5abf-9324-d10d144020e4",
+              "leftValue": "={{ String($json.poll_limit_reached) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "22f729f1-ec66-5cf6-8e64-ad676985f68a",
+      "name": "Polling-Limit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1020,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"http://agent-manager:8080/jobs/\" + $json.job_id + \"/cancel\" }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "7c0b6e80-8456-5738-b2ed-4e281a294c8f",
+      "name": "Job abbrechen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1230,
+        210
+      ],
+      "notes": "Bei zu vielen Polls wird der laufende Container angehalten.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const j=$input.first().json;\nreturn [{json:{outcome:'poll_limit_cancelled',job_id:j.job_id,provider:j.provider,role:j.role,status:j.status,exit_code:j.exit_code,result:j.result||null,logs_tail:j.logs_tail||null,info:'Polling-Limit erreicht. Stop wurde angefordert.'}}];"
+      },
+      "id": "6a29b290-8aea-53fc-8062-cf6182ac1502",
+      "name": "Abbruch Ergebnis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        210
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const j=$input.first().json;\nconst ok=j.status==='succeeded'&&j.result?.status==='ok';\nreturn [{json:{outcome:ok?'succeeded':'failed',job_id:j.job_id,provider:j.provider,role:j.role,status:j.status,exit_code:j.exit_code,poll_count:j.poll_count,summary:j.result?.summary||null,result:j.result||null,logs_tail:j.logs_tail||null}}];"
+      },
+      "id": "6e7ef4f8-c2bb-5af6-b862-79b5ca3eb289",
+      "name": "Auftrag Ergebnis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1230,
+        430
+      ]
+    }
+  ],
+  "connections": {
+    "Manueller Auftrag": {
+      "main": [
+        [
+          {
+            "node": "Auftrag konfigurieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auftrag konfigurieren": {
+      "main": [
+        [
+          {
+            "node": "Auftrag validieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auftrag validieren": {
+      "main": [
+        [
+          {
+            "node": "Job starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job starten": {
+      "main": [
+        [
+          {
+            "node": "3 Sekunden warten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 Sekunden warten": {
+      "main": [
+        [
+          {
+            "node": "Job abfragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job abfragen": {
+      "main": [
+        [
+          {
+            "node": "Status auswerten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status auswerten": {
+      "main": [
+        [
+          {
+            "node": "Weiter warten?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weiter warten?": {
+      "main": [
+        [
+          {
+            "node": "3 Sekunden warten",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Polling-Limit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Polling-Limit?": {
+      "main": [
+        [
+          {
+            "node": "Job abbrechen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auftrag Ergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job abbrechen": {
+      "main": [
+        [
+          {
+            "node": "Abbruch Ergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "d22dba82-b6ff-5236-a66d-78aaca527d97"
+}

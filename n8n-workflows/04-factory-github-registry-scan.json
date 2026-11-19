@@ -1,0 +1,191 @@
+{
+  "name": "Factory 04 | GitHub Registry überwachen",
+  "nodes": [
+    {
+      "id": "af366d02-408e-57d0-a356-529a332b2c92",
+      "name": "Info GitHub",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -550,
+        -250
+      ],
+      "parameters": {
+        "content": "# Factory 04 – Private GitHub Repository-Registry\n\nJeder Zyklus (alle 2 Minuten): 1. Leeres privates Registry-Repository initialisieren. 2. Ausschließlich manuell angelegte `repos/*.repo`-Dateien mit genau einer GitHub-URL einlesen. 3. Zugeordnete Kanban-Boards/Kategorien einrichten. 4. Issues prüfen. Entfernte Dateien werden NICHT automatisch wieder angelegt. Für diese Aufgaben wird kein KI-Worker gestartet.",
+        "width": 480,
+        "height": 380,
+        "color": 5
+      }
+    },
+    {
+      "id": "1b7cf15c-6d2a-553b-af86-726e74649692",
+      "name": "Alle 2 Minuten",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -440,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "12fdbd51-517e-5863-819d-5f30921bcd47",
+      "name": "Private Repos pruefen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        540,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://github-registry:8090/scan",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "notes": "Internes Docker-Netz; kein GitHub-Token in n8n.",
+      "notesInFlow": true
+    },
+    {
+      "id": "35e56b3d-9218-5a2a-bc7d-69dbc56d805a",
+      "name": "Issues ausgeben",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        810,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$input.first().json; const summary={kind:'scan_summary',registry:r.registry,config_count:r.config_count,new_events_count:r.new_events_count,repositories:r.repositories,truncated:r.truncated}; const out=[{json:summary}]; for(const issue of (r.new_events||[])){out.push({json:{kind:'github_issue',...issue}});} return out;"
+      }
+    },
+    {
+      "id": "f8a731b6-2f08-5496-ace1-d2a8876f7f11",
+      "name": "Kanban Boards sicherstellen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        50,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://github-registry:8090/boards/ensure",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "notes": "Erzeugt fehlende GitHub Projects Boards und Kategorien. Kein Agent-Container.",
+      "notesInFlow": true
+    },
+    {
+      "id": "e91c87bd-cd3d-5b3b-a8ad-4741b26411cf",
+      "name": "Board Fehler pruefen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        290,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r=$input.first().json; if((r.errors||0)>0){const failing=(r.boards||[]).filter(x=>x.status==='error').map(x=>x.repository+': '+x.error).join('; ');throw new Error('Kanban-Provisionierung fehlgeschlagen: '+failing);} return [{json:r}];"
+      }
+    },
+    {
+      "id": "96fab45b-d13d-524f-9ed3-4cbbbc0eb0d6",
+      "name": "Registry automatisch initialisieren",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -200,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://github-registry:8090/bootstrap",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Alle 2 Minuten": {
+      "main": [
+        [
+          {
+            "node": "Registry automatisch initialisieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Private Repos pruefen": {
+      "main": [
+        [
+          {
+            "node": "Issues ausgeben",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kanban Boards sicherstellen": {
+      "main": [
+        [
+          {
+            "node": "Board Fehler pruefen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Board Fehler pruefen": {
+      "main": [
+        [
+          {
+            "node": "Private Repos pruefen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registry automatisch initialisieren": {
+      "main": [
+        [
+          {
+            "node": "Kanban Boards sicherstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "b4f94100-6cd8-5e36-aad5-69f618e8f6bb"
+}

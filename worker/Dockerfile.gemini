@@ -1,0 +1,19 @@
+# Gemini CLI worker: independent dependency and update cycle.
+FROM node:22-bookworm-slim
+ARG GEMINI_VERSION=latest
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash ca-certificates git curl jq ripgrep python3 python3-venv python3-pip \
+    build-essential make \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g "@google/gemini-cli@${GEMINI_VERSION}"
+RUN mkdir -p /opt/factory /workspace /auth/.gemini && chown -R node:node /workspace /auth
+COPY worker/agent.py /opt/factory/agent.py
+COPY worker/limits.py /opt/factory/limits.py
+COPY worker/git-askpass.sh /opt/factory/git-askpass.sh
+RUN chmod 0755 /opt/factory/git-askpass.sh
+USER node
+WORKDIR /workspace
+ENV PYTHONUNBUFFERED=1 HOME=/auth XDG_CACHE_HOME=/auth/.cache \
+    GEMINI_CLI_TRUST_WORKSPACE=true GEMINI_TELEMETRY_ENABLED=false \
+    GEMINI_CLI_NO_RELAUNCH=true
+ENTRYPOINT ["python3", "/opt/factory/agent.py"]

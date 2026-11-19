@@ -1,0 +1,130 @@
+{
+  "name": "Factory 08 | GitHub CI & automatischer PR-Merge",
+  "nodes": [
+    {
+      "id": "466f468b-1af3-5781-af95-11bf823b6f1a",
+      "name": "Info – Merge Gate",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -500,
+        -280
+      ],
+      "parameters": {
+        "content": "# Factory 08 – Merge Gate (GitHub)\n\nLäuft im n8n-Zeitplan. **Kein KI-Worker** für die Merge-Entscheidung.\n\nEin Merge erfolgt nur, wenn:\n1. Reviewer-Ergebnis für den **aktuellen Commit SHA** erfolgreich ist;\n2. alle in der YAML konfigurierten GitHub-CI-Checks erfolgreich sind;\n3. das Ticket auf **Review** steht;\n4. GitHub das Mergen erlaubt (Branch-Protection);\n5. `FACTORY_GITHUB_AUTOMERGE_ENABLED=true` UND `pipeline.auto_merge: true`.\n\nCI-Fehler -> verknüpftes Fehler-Issue -> Status **In Arbeit** -> neuer Developer.\nAlle GitHub-Operationen erfolgen über den internen Adapter `github-registry`; n8n besitzt keine GitHub-Zugangsdaten.",
+        "width": 590,
+        "height": 370,
+        "color": 5
+      }
+    },
+    {
+      "id": "892fa208-e5a8-5298-9166-f850cc334453",
+      "name": "Alle 2 Minuten",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -430,
+        180
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "78ff5c70-c433-5d00-be78-ccde796d42ff",
+      "name": "Manueller Merge-Check",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -430,
+        340
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "0f230021-6f43-5c0b-a22b-cca8af4a36ff",
+      "name": "PRs pruefen und mergen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -120,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://github-registry:8090/runner/merge-ready",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "notes": "GitHub-CI + AI-Review werden fuer GENAU den aktuellen Head-SHA geprueft, erst dann Squash-Merge.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a7e6a570-065e-5414-989d-0c137a1ed0c8",
+      "name": "Merge-Ergebnis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        185,
+        220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const x=$input.first().json; return [{json:{factory:'factory',step:'merge_gate',enabled:x.enabled,merged_count:(x.merged||[]).length,merged:x.merged||[],waiting:x.waiting||[]}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Alle 2 Minuten": {
+      "main": [
+        [
+          {
+            "node": "PRs pruefen und mergen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manueller Merge-Check": {
+      "main": [
+        [
+          {
+            "node": "PRs pruefen und mergen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PRs pruefen und mergen": {
+      "main": [
+        [
+          {
+            "node": "Merge-Ergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "f5e036f1-7ebc-5316-8c14-5ec219384c3f"
+}

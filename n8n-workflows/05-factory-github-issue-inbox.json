@@ -1,0 +1,94 @@
+{
+  "name": "Factory 05 | GitHub Issues Eingang",
+  "nodes": [
+    {
+      "id": "c10b869f-c500-5fbd-a379-cf9ecfc1099c",
+      "name": "Info Tickets",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -550,
+        -250
+      ],
+      "parameters": {
+        "content": "# Factory 05 – GitHub Issue Eingang\n\nManueller Blick auf die zentral gesammelten GitHub Issues.\n\nAlle Events werden dedupliziert in PostgreSQL gespeichert, bis sie gesichtet/weiterverarbeitet werden.\n\nDiese Version startet **keine** KI-Agenten. Die Ausfuehrung verbinden wir spaeter mit einem separaten Freigabe-/Orchestrierungs-Workflow.",
+        "width": 480,
+        "height": 275,
+        "color": 5
+      }
+    },
+    {
+      "id": "e23ab50e-2c75-5a94-a8b4-2b348afcd80a",
+      "name": "Issue Eingang anzeigen",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        180
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "77737aa8-6ee0-58d3-b72d-8ada568a11f1",
+      "name": "Offene GitHub Tickets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -100,
+        180
+      ],
+      "parameters": {
+        "url": "http://github-registry:8090/events?status=pending&limit=100",
+        "options": {}
+      }
+    },
+    {
+      "id": "00cdb6b8-1042-546b-9cd2-4b363ed89f1c",
+      "name": "Inbox Liste",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        170,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const events=$input.first().json.events||[];if(!events.length){return [{json:{kind:'inbox_status',pending:0,message:'Keine offenen GitHub-Issue-Ereignisse'}}];}return events.map(e=>({json:{kind:'github_issue',...e}}));"
+      }
+    }
+  ],
+  "connections": {
+    "Issue Eingang anzeigen": {
+      "main": [
+        [
+          {
+            "node": "Offene GitHub Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Offene GitHub Tickets": {
+      "main": [
+        [
+          {
+            "node": "Inbox Liste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "24fe5ee0-14c4-529f-8343-7e40fe32372c"
+}

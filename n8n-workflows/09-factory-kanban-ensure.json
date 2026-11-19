@@ -1,0 +1,106 @@
+{
+  "name": "Factory 09 | GitHub Kanban Boards bereitstellen",
+  "nodes": [
+    {
+      "id": "dbf8bed3-13bb-544f-97f4-51ed16c28c17",
+      "name": "Manuell starten",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        120
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f761184f-f34d-5dd1-8d0c-73e08f1d23d1",
+      "name": "Boards sicherstellen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://github-registry:8090/boards/ensure",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "fe1ad87f-0a8f-55f8-a254-e05a5a12ac91",
+      "name": "Provisionierung ausgeben",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data=$input.first().json; return [{json:{registry:data.registry, errors:data.errors, boards:data.boards}}];"
+      }
+    },
+    {
+      "id": "7376feb7-64d9-503d-aba5-2af59033e88c",
+      "name": "Registry automatisch initialisieren",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        40,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://github-registry:8090/bootstrap",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manuell starten": {
+      "main": [
+        [
+          {
+            "node": "Registry automatisch initialisieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Boards sicherstellen": {
+      "main": [
+        [
+          {
+            "node": "Provisionierung ausgeben",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registry automatisch initialisieren": {
+      "main": [
+        [
+          {
+            "node": "Boards sicherstellen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": [],
+  "id": "fa040812-c428-52e2-8736-4ab9e101125d"
+}

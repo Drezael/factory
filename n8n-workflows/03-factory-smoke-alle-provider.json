@@ -1,0 +1,306 @@
+{
+  "name": "Factory 03 | Codex Claude Gemini Smoke",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Factory 03 – 3 Worker testen\n\nErstellt drei `smoke`-Jobs: Codex, Claude und Gemini. **Keine KI-Anmeldungen erforderlich.**\n\nWartet bis alle Jobs beendet sind, maximal 45 Abfragen à 3 Sekunden.\n\nNur zwei HTTP-Nodes brauchen Header Auth.",
+        "width": 470,
+        "height": 290,
+        "color": 5
+      },
+      "id": "d7ec46f7-cf2b-53c4-b0cc-74d73c3358eb",
+      "name": "INFO 03",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -930,
+        -270
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ed6990d8-d5c1-5bbc-bc61-4c6cac94741f",
+      "name": "Alle Worker testen",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return ['codex','claude','gemini'].map(provider => ({json:{provider,role:'smoke',task:'Pruefe Laufzeit-Werkzeuge und CLI-Version',timeout_seconds:90}}));"
+      },
+      "id": "02520a5f-c297-5cd3-8dbe-9bf11fb55f36",
+      "name": "Drei Smoke-Auftraege",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://agent-manager:8080/jobs",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "f5db0e31-2578-5b48-abb8-0cef20166b20",
+      "name": "Smoke Jobs starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -230,
+        180
+      ],
+      "notes": "Ein HTTP-Request pro eingehendem Item. Jeder Provider erhaelt einen separaten Container.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const jobs=$input.all().map(i=>({job_id:i.json.job_id,provider:i.json.provider}));\nif(jobs.length!==3||jobs.some(j=>!j.job_id)) throw new Error('Nicht alle drei Jobs gestartet. Manager-Logs pruefen.');\nreturn [{json:{jobs}}];"
+      },
+      "id": "3075f014-1be2-5809-a192-b8f4e95a1752",
+      "name": "Job IDs merken",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "afterTimeInterval",
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "b445c79e-2209-53e9-b98f-dc19e71082ed",
+      "name": "3 Sekunden warten (alle)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const j=$input.first().json;\nconst jobs=j.jobs||(j.checks||[]).map(s=>({job_id:s.job_id,provider:s.provider}));\nif(jobs.length!==3) throw new Error('Drei job_ids erwartet');\nreturn jobs.map(x=>({json:x}));"
+      },
+      "id": "5f189336-48c4-5b0c-b25a-6e0c281b5d61",
+      "name": "Drei Jobs abfragen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        490,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ \"http://agent-manager:8080/jobs/\" + $json.job_id }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "289b3f58-3f5f-56b2-bb79-0022b42aa634",
+      "name": "Smoke Status abrufen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const checks=$input.all().map(i=>i.json);\nconst attempt=$runIndex+1;\nconst waiting=checks.filter(j=>['pending','running'].includes(j.status));\nconst timed_out=waiting.length>0&&attempt>=45;\nreturn [{json:{checks,poll_count:attempt,waiting_count:waiting.length,complete:waiting.length===0||timed_out,timed_out}}];"
+      },
+      "id": "5f6d5ae0-6709-5998-b499-07e000c89305",
+      "name": "Smoke Fortschritt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "96e498da-2620-5126-ba16-be6e09d70f7e",
+              "leftValue": "={{ String($json.complete) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7c93b9e6-1c99-5162-93f1-9591c705d15c",
+      "name": "Alle abgeschlossen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1180,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const x=$input.first().json;\nconst results=x.checks.map(j=>({\n  provider:j.provider,job_id:j.job_id,status:j.status,exit_code:j.exit_code,\n  success:j.status==='succeeded'&&j.result?.status==='ok',\n  summary:j.result?.summary||null,\n  logs_tail:j.status==='succeeded'?'':(j.logs_tail||'')\n}));\nreturn [{json:{factory:'factory',all_succeeded:results.every(j=>j.success),poll_count:x.poll_count,timed_out:x.timed_out,results}}];"
+      },
+      "id": "c923da14-7f25-5e02-81b5-8ae9fe319f32",
+      "name": "Gesamtergebnis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1410,
+        150
+      ]
+    }
+  ],
+  "connections": {
+    "Alle Worker testen": {
+      "main": [
+        [
+          {
+            "node": "Drei Smoke-Auftraege",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drei Smoke-Auftraege": {
+      "main": [
+        [
+          {
+            "node": "Smoke Jobs starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smoke Jobs starten": {
+      "main": [
+        [
+          {
+            "node": "Job IDs merken",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job IDs merken": {
+      "main": [
+        [
+          {
+            "node": "3 Sekunden warten (alle)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 Sekunden warten (alle)": {
+      "main": [
+        [
+          {
+            "node": "Drei Jobs abfragen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drei Jobs abfragen": {
+      "main": [
+        [
+          {
+            "node": "Smoke Status abrufen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smoke Status abrufen": {
+      "main": [
+        [
+          {
+            "node": "Smoke Fortschritt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smoke Fortschritt": {
+      "main": [
+        [
+          {
+            "node": "Alle abgeschlossen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alle abgeschlossen?": {
+      "main": [
+        [
+          {
+            "node": "Gesamtergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "3 Sekunden warten (alle)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "152eb4e6-6537-5290-9d61-ac8f590c6a7d"
+}
